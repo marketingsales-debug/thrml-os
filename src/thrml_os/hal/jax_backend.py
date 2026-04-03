@@ -182,19 +182,9 @@ class JAXBackend(Backend):
         
         # Initialize state if not provided
         if initial_state is None:
-            # Use THRML's initialization
-            if hasattr(model, 'models') and 'ising' in str(type(model)).lower():
-                from thrml.models import hinton_init
-                initial_state = hinton_init(context.key, model, free_blocks, ())
-            else:
-                # Random initialization
-                key, subkey = jax.random.split(context.key)
-                n_nodes = len(nodes)
-                initial_state = jax.random.choice(
-                    subkey, 
-                    jnp.array([-1, 1]), 
-                    shape=(n_nodes,)
-                )
+            from thrml.models import hinton_init
+            key, init_key = jax.random.split(context.key)
+            initial_state = hinton_init(init_key, model, free_blocks, ())
         
         # Build sampling program
         if hasattr(model, '__class__') and 'Ising' in model.__class__.__name__:
@@ -211,7 +201,7 @@ class JAXBackend(Backend):
         # Use THRML's sample_states
         key, sample_key = jax.random.split(context.key)
         
-        samples = sample_states(
+        raw_samples = sample_states(
             sample_key,
             program,
             thrml_schedule,
@@ -219,19 +209,16 @@ class JAXBackend(Backend):
             [],  # No observed blocks
             [Block(nodes)],  # Collect all nodes
         )
-        
+
+        # sample_states returns a list of arrays, one per observe block
+        samples = raw_samples[0]
+
         elapsed = time.time() - start_time
-        
-        # Calculate energies if model supports it
-        energies = None
-        if hasattr(model, 'energy'):
-            energies = jax.vmap(model.energy)(samples)
-        
+
         # Yield as a single batch
-        # (Could be modified to yield incrementally for streaming)
         batch = SampleBatch(
             samples=samples,
-            energies=energies,
+            energies=None,
             collection_time_ms=elapsed * 1000,
         )
         

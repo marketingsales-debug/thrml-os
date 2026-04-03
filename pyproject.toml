@@ -49,7 +49,7 @@ docs = [
 ]
 
 [project.scripts]
-thrml-os = "thrml_os.cli:main"
+thrml-os = "thrml_os.cli.main:main"
 
 [project.urls]
 Homepage = "https://github.com/thrml-os/thrml-os"
